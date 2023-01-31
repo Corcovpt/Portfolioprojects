@@ -1,0 +1,133 @@
+SELECT location, date, total_cases, new_cases, total_deaths, population
+FROM covid_deaths
+order by 1,2
+
+--loking at total cases vs total deaths
+-- shows the likelihood of dying if you get covid
+
+SELECT location, date, total_cases, total_deaths, (total_deaths/total_cases)*100 as deathpercent
+FROM covid_deaths
+WHERE location like '%States%'
+order by 1, 2
+
+-- looking at the toal cases vs the population
+
+SELECT location, date, total_cases, population, (total_cases/population)*100 as covid_percentage
+FROM covid_deaths
+WHERE location like '%Ecuador%'
+order by 1, 2
+
+-- looking at countries with the highestinfection rates compared to population
+
+SELECT location, population, MAX(total_cases) as Higest_infectioncount,  MAX((total_cases/population))*100 as percentpopinfected
+FROM covid_deaths
+--WHERE location like '%Ecuador%'
+GROUP BY 1,2
+order by 4 DESC
+
+
+-- looking at countries with the highest death rates compared to population
+
+SELECT location, population, MAX(cast(total_deaths as int)) as Higest_deathcount  --MAX((total_deaths/population))*100 as percentpopdeaths
+FROM covid_deaths
+WHERE continent is not null
+GROUP BY 1,2
+order by 3 DESC
+
+
+--- by continent
+
+SELECT location, MAX(cast(total_deaths as int)) as Higest_deathcount  --MAX((total_deaths/population))*100 as percentpopdeaths
+FROM covid_deaths
+WHERE continent is  null
+GROUP BY 1
+order by 2 DESC
+
+-- by continent
+
+SELECT continent, max(cast(total_deaths as int)) as Higest_deathcount  --MAX((total_deaths/population))*100 as percentpopdeaths
+FROM covid_deaths
+WHERE continent is not  null
+GROUP BY 1
+order by 2 DESC
+
+-- global numbers
+
+SELECT date, SUM(new_cases) as totalcases, sum(new_deaths) as totaldeaths,sum(new_deaths)/sum(new_cases)*100 as deathpercentage --, total_deaths, (total_deaths/total_cases)*100 as deathpercent
+FROM covid_deaths
+WHERE continent is not  null 
+GROUP BY 1
+order by 1,2
+
+
+--- new table covid vaccinations
+
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations, sum(new_vaccinations) over (partition by dea.location order by dea.location,dea.date) as rollingpeoplevac 
+FROM covid_deaths dea
+JOIN covid_vaccinations vac
+on dea.location = vac.location
+and dea.date = vac.date
+where dea.continent is not null
+order by 2,3
+
+-- use CTE
+
+with popsvsvac (contient, location, date, population, new_vaccinations, rollingpeoplevac)
+as 
+(
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations, 
+	sum(new_vaccinations) over (partition by dea.location order by dea.location,dea.date) as rollingpeoplevac 
+FROM covid_deaths dea
+JOIN covid_vaccinations vac
+on dea.location = vac.location
+and dea.date = vac.date
+where dea.continent is not null
+	---and dea.location = 'Ecuador'
+--order by 2,3
+)
+
+SELECT *, (rollingpeoplevac/population)*100
+FROM popsvsvac
+
+--- TEMP TABLE
+
+DROP TABLE IF EXISTS percentpopulationvaccinated
+CREATE TABLE percentpopulationvaccinated
+(
+continent text,
+location text,
+date date,
+population numeric,
+new_vaccinations numeric,
+rollingpeoplevac numeric	
+)
+
+INSERT INTO percentpopulationvaccinated (continent, location, date, population, new_vaccinations, rollingpeoplevac)
+
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations, 
+	sum(new_vaccinations) over (partition by dea.location order by dea.location,dea.date) as rollingpeoplevac 
+FROM covid_deaths dea
+JOIN covid_vaccinations vac
+on dea.location = vac.location
+and dea.date = vac.date
+where dea.continent is not null
+	---and dea.location = 'Ecuador'
+--order by 2,3
+
+SELECT *, (rollingpeoplevac/population)*100
+FROM percentpopulationvaccinated
+
+--- CREATING VIEWS
+
+CREATE VIEW percentpopulationvaccinated2 AS
+
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations, 
+	sum(new_vaccinations) over (partition by dea.location order by dea.location,dea.date) as rollingpeoplevac 
+FROM covid_deaths dea
+JOIN covid_vaccinations vac
+on dea.location = vac.location
+and dea.date = vac.date
+where dea.continent is not null
+	---and dea.location = 'Ecuador'
+--order by 2,3
+
