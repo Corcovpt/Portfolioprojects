@@ -1,0 +1,66 @@
+Main query
+
+
+with main as
+(
+SELECT
+    EXTRACT(YEAR FROM TO_DATE(snapshot_year, 'DD/MM/YYYY')) AS order_year,
+	EXTRACT(YEAR FROM TO_DATE(acq_year, 'DD/MM/YYYY')) AS acq_year,
+	analytical_customer_id,
+	    CASE 
+        WHEN EXTRACT(YEAR FROM TO_DATE(snapshot_year, 'DD/MM/YYYY')) = EXTRACT(YEAR FROM TO_DATE(acq_year, 'DD/MM/YYYY')) THEN 'nc' 
+        WHEN EXTRACT(YEAR FROM TO_DATE(snapshot_year, 'DD/MM/YYYY')) <> EXTRACT(YEAR FROM TO_DATE(acq_year, 'DD/MM/YYYY')) OR acq_year IS NULL THEN 'rc' 
+    END AS user_type,
+	status_by_eoy,
+    ct_orders,
+	inc_orders,
+	sum_incentives,
+	sum_df
+FROM
+    dh_case_study
+GROUP BY
+    1,2,3,4,5,6,7,8,9
+ORDER BY
+    1 DESC
+),
+
+churn as
+
+(
+SELECT
+    EXTRACT(YEAR FROM TO_DATE(snapshot_year, 'DD/MM/YYYY')) AS order_year,
+	analytical_customer_id,
+	active_months,
+	EXTRACT(MONTH FROM TO_DATE(last_order_in_year, 'DD/MM/YYYY')) as last_month,
+    ct_orders
+   
+FROM
+    dh_case_study
+WHERE status_by_eoy = 'Churner' AND EXTRACT(YEAR FROM TO_DATE(snapshot_year, 'DD/MM/YYYY')) = '2022'
+GROUP BY
+    1,2,3,4,5
+ORDER BY
+    1 DESC
+)
+
+SELECT
+main.order_year,
+main.acq_year,
+main.analytical_customer_id,
+main.user_type,
+main.status_by_eoy,
+churn.last_month,
+COUNT(DISTINCT main.analytical_customer_id) AS unique_users,
+CAST(SUM(main.ct_orders) AS numeric) AS orders,
+CAST(SUM(main.inc_orders) AS numeric) AS promo_orders,
+CAST(SUM(main.sum_incentives) AS numeric) AS incentives,
+CAST(SUM(main.sum_df) AS numeric) AS df,
+ROUND(CAST(SUM(main.ct_orders) AS numeric) / CAST(COUNT(DISTINCT main.analytical_customer_id) AS numeric) / 12, 2) AS monthly_frequency,
+ROUND(COALESCE((CAST(SUM(churn.ct_orders) AS numeric) / churn.last_month * 12), 0) - COALESCE((CAST(SUM(churn.ct_orders) AS numeric)), 0), 2) AS churn_orders
+FROM main
+LEFT JOIN churn ON main.analytical_customer_id = churn.analytical_customer_id
+AND main.order_year = churn.order_year
+GROUP BY 1,2,3,4,5,6
+ORDER BY 2
+;
+
