@@ -1,3 +1,21 @@
+Table creation
+
+CREATE TABLE dh_case_study (
+    global_entity_id VARCHAR,
+    analytical_customer_id VARCHAR,
+    acq_year VARCHAR,
+    last_order_in_year VARCHAR,
+    status_by_eoy VARCHAR,
+    is_capital_city VARCHAR,
+    snapshot year VARCHAR,
+	active_months FLOAT,
+    ct_orders FLOAT,
+    inc_orders FLOAT,
+	sum_incentives FLOAT,
+	sum_df FLOAT
+);
+
+
 Main query
 
 
@@ -6,6 +24,7 @@ with main as
 SELECT
     EXTRACT(YEAR FROM TO_DATE(snapshot_year, 'DD/MM/YYYY')) AS order_year,
 	EXTRACT(YEAR FROM TO_DATE(acq_year, 'DD/MM/YYYY')) AS acq_year,
+	last_order_in_year,
 	analytical_customer_id,
 	    CASE 
         WHEN EXTRACT(YEAR FROM TO_DATE(snapshot_year, 'DD/MM/YYYY')) = EXTRACT(YEAR FROM TO_DATE(acq_year, 'DD/MM/YYYY')) THEN 'nc' 
@@ -19,7 +38,7 @@ SELECT
 FROM
     dh_case_study
 GROUP BY
-    1,2,3,4,5,6,7,8,9
+    1,2,3,4,5,6,7,8,9,10
 ORDER BY
     1 DESC
 ),
@@ -36,7 +55,7 @@ SELECT
    
 FROM
     dh_case_study
-WHERE status_by_eoy = 'Churner' AND EXTRACT(YEAR FROM TO_DATE(snapshot_year, 'DD/MM/YYYY')) = '2022'
+WHERE status_by_eoy = 'Churner' --AND EXTRACT(YEAR FROM TO_DATE(snapshot_year, 'DD/MM/YYYY')) = '2022'
 GROUP BY
     1,2,3,4,5
 ORDER BY
@@ -50,6 +69,7 @@ main.analytical_customer_id,
 main.user_type,
 main.status_by_eoy,
 churn.last_month,
+EXTRACT(YEAR FROM TO_DATE(main.last_order_in_year, 'DD/MM/YYYY')) as last_year,
 COUNT(DISTINCT main.analytical_customer_id) AS unique_users,
 CAST(SUM(main.ct_orders) AS numeric) AS orders,
 CAST(SUM(main.inc_orders) AS numeric) AS promo_orders,
@@ -60,7 +80,7 @@ ROUND(COALESCE((CAST(SUM(churn.ct_orders) AS numeric) / churn.last_month * 12), 
 FROM main
 LEFT JOIN churn ON main.analytical_customer_id = churn.analytical_customer_id
 AND main.order_year = churn.order_year
-GROUP BY 1,2,3,4,5,6
+GROUP BY 1,2,3,4,5,6,7
 ORDER BY 2
 ;
 
